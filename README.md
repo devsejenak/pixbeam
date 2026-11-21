@@ -2,13 +2,13 @@
 
 Send files from your screen to your phone through the camera. No internet, no cables, no app.
 
-I built Pixbeam because moving a small file from a laptop to a phone should not need a USB cable, a chat app, or a cloud upload. Open it on the laptop, pick a file, and point your phone's camera at the screen. The file plays as animated color codes, and the phone rebuilds it from what it sees. Everything runs in the browser and nothing leaves your devices.
+Open it on the browser, pick a file, and point your phone's camera at the screen. The file plays as animated color codes, and the phone rebuilds it from what it sees. Everything runs in the browser and nothing leaves your devices.
 
 Try it: [tools.devsejenak.com/pixbeam](https://tools.devsejenak.com/pixbeam)
 
 ## How it works
 
-1. The file is compressed, split into blocks, and encoded with a fountain code (LT), so the phone can rebuild it from any frames it catches. Missed frames don't matter.
+1. The file is compressed, split into blocks, and encoded with a fountain code (LT), so the phone can rebuild it from any frames it catches.
 2. Each packet gets a header and a CRC32, then is drawn as colored cells (1, 2, or 3 bits per cell).
 3. Every frame has corner markers, alignment markers, and a color palette row for calibration.
 4. The receiver tracks the markers, straightens the image on the GPU (WebGL2), reads the colors, checks the CRC, and assembles the file.
@@ -19,7 +19,7 @@ Try it: [tools.devsejenak.com/pixbeam](https://tools.devsejenak.com/pixbeam)
 npm install pixbeam
 ```
 
-The React component needs `react` and `react-dom` 18 or newer. The codec works without React.
+The React component needs `react` and `react-dom` 18 or newer.
 
 ## Usage
 
