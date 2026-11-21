@@ -3,6 +3,23 @@
   "version": "0.3.0",
   "description": "Kirim file dari layar ke kamera HP lewat animasi kode berwarna, langsung di browser.",
   "license": "MIT",
+  "author": "devsejenak",
+  "homepage": "https://tools.devsejenak.com/pixbeam",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/devsejenak/pixbeam.git"
+  },
+  "bugs": "https://github.com/devsejenak/pixbeam/issues",
+  "keywords": [
+    "file-transfer",
+    "qr",
+    "color-code",
+    "fountain-code",
+    "camera",
+    "webgl",
+    "offline",
+    "react"
+  ],
   "type": "module",
   "sideEffects": [
     "*.css"
@@ -12,9 +29,31 @@
     "./react": "./src/react/index.ts",
     "./style.css": "./src/react/pixbeam.css"
   },
+  "files": [
+    "dist/**/*.js",
+    "dist/**/*.d.ts",
+    "dist/style.css"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "types": "./dist/index.d.ts",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "./react": {
+        "types": "./dist/react/index.d.ts",
+        "default": "./dist/react/index.js"
+      },
+      "./style.css": "./dist/style.css"
+    }
+  },
   "scripts": {
     "dev": "vite demo",
-    "build": "node scripts/build-standalone.mjs",
+    "build": "node scripts/build-lib.mjs",
+    "build:standalone": "node scripts/build-standalone.mjs",
+    "prepublishOnly": "node scripts/check-publish.mjs && pnpm typecheck && pnpm test && pnpm build",
     "typecheck": "tsc -p .",
     "test": "node scripts/run-test.mjs node",
     "test:alignment": "node scripts/run-test.mjs alignment",
@@ -23,6 +62,14 @@
   "peerDependencies": {
     "react": ">=18",
     "react-dom": ">=18"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    },
+    "react-dom": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@types/react": "^19.3.0",

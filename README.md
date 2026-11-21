@@ -23,6 +23,14 @@ demo/      halaman dev (Vite)
 test/      simulasi kamera di Node
 ```
 
+## Instalasi
+
+```bash
+npm install pixbeam
+```
+
+Komponen React butuh `react` dan `react-dom` versi 18 ke atas. Codec di `pixbeam` bisa dipakai tanpa React.
+
 ## Pakai sebagai komponen
 
 ```tsx
@@ -36,9 +44,19 @@ import 'pixbeam/style.css'
 
 ```bash
 pnpm dev          # demo di http://localhost:5173
-pnpm build        # dist/pixbeam.html (satu file)
+pnpm build        # library ke dist/ (JS, .d.ts, style.css)
+pnpm build:standalone  # dist/pixbeam.html (satu file)
 pnpm test         # simulasi kamera 1080p
 pnpm typecheck
+```
+
+## Publish ke npm
+
+Wajib lewat `pnpm publish`, bukan `npm publish`. Di repo, `exports` menunjuk ke `src/`, dan hanya pnpm yang menggantinya ke `dist/` lewat `publishConfig`. `prepublishOnly` menjalankan typecheck, test, dan build secara otomatis, dan menolak kalau dijalankan dari npm.
+
+```bash
+pnpm publish --dry-run   # cek isi paket dulu
+pnpm publish
 ```
 
 Kamera hanya bisa dipakai lewat HTTPS atau localhost.
