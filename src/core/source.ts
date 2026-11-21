@@ -23,7 +23,7 @@ export function packSource(name: string, payload: Uint8Array, compressed: boolea
 }
 
 export function unpackSource(src: Uint8Array): SourceInfo {
-  if (src[0] !== 80 || src[1] !== 66) throw new Error('Format tidak dikenal')
+  if (src[0] !== 80 || src[1] !== 66) throw new Error('Unknown format')
   const dv = new DataView(src.buffer, src.byteOffset, src.byteLength)
   const nameLen = dv.getUint16(12)
   return {

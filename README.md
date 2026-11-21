@@ -32,15 +32,47 @@ export default function App() {
 }
 ```
 
-This gives you the full send and receive UI. Use `#kirim` (send) or `#terima` (receive) in the URL to open a tab directly. The built-in UI text is currently in Indonesian.
+This gives you the full send and receive UI. Use `#send` or `#receive` in the URL to open a tab directly (the hashes follow the locale, e.g. `#kirim` / `#terima` in Indonesian; the built-in hashes of every locale are always accepted).
 
 ### Props
 
 | Prop | Type | Description |
 |---|---|---|
 | `config` | `Partial<PixbeamConfig>` | Override the defaults below |
+| `locale` | `'en' \| 'id'` | Built-in UI language. Default `'en'` |
+| `messages` | `DeepPartial<PixbeamMessages>` | Override any UI text on top of `locale` |
 | `heading` | `string` | Optional title above the UI |
 | `intro` | `string` | Optional text under the title |
+
+### Language
+
+The UI ships in English (`en`) and Indonesian (`id`):
+
+```tsx
+<Pixbeam locale="id" />
+```
+
+Change only the strings you need with `messages`. Anything you leave out falls back to the chosen locale:
+
+```tsx
+<Pixbeam
+  locale="en"
+  messages={{
+    tabs: { send: 'Share', sendHash: 'share' },
+    send: { start: 'Beam it', sending: (name) => `Beaming ${name}…` },
+  }}
+/>
+```
+
+To add a new language, spread a full `PixbeamMessages` object. `locales.en` is a good starting point, and TypeScript will tell you what is missing:
+
+```ts
+import { locales, type PixbeamMessages } from 'pixbeam/react'
+
+const fr: PixbeamMessages = { ...locales.en, numberLocale: 'fr-FR', tabs: { ...locales.en.tabs, send: 'Envoyer' } }
+```
+
+Camera errors from `Scanner.start()` are thrown as `ScanError` with a stable `code` (`'no-camera'`, `'no-webgl'`, `'camera-denied'`, `'camera-not-found'`, `'camera-busy'`, `'unknown'`), and the UI shows `messages.receive.errors[code]`.
 
 ### Config
 
@@ -78,6 +110,7 @@ src/
   web/       WebGL2 source, sender, camera scanner, auto zoom, debug panel
   react/     <Pixbeam /> component and pixbeam.css
   config.ts  defaults and options
+  i18n.ts    UI text (en, id) and resolveMessages
 demo/        dev page (Vite)
 test/        camera simulation
 ```

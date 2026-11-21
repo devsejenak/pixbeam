@@ -40,6 +40,19 @@ export interface FpsInfo {
   height: number
 }
 
+export type ScanErrorCode = 'no-camera' | 'no-webgl' | 'camera-denied' | 'camera-not-found' | 'camera-busy' | 'unknown'
+
+/** Thrown by {@link Scanner.start}. `code` is stable, `message` is English and meant for logs. */
+export class ScanError extends Error {
+  constructor(
+    readonly code: ScanErrorCode,
+    message: string,
+  ) {
+    super(message)
+    this.name = 'ScanError'
+  }
+}
+
 export class Scanner {
   private receiver = new Receiver()
   private gl: GlSource | null = null
@@ -67,13 +80,23 @@ export class Scanner {
   }
 
   async start() {
-    if (!navigator.mediaDevices?.getUserMedia) throw new Error('Kamera tidak tersedia. Buka halaman ini lewat HTTPS atau localhost.')
-    if (!GlSource.supported()) throw new Error('Browser ini tidak mendukung WebGL2.')
+    if (!navigator.mediaDevices?.getUserMedia) throw new ScanError('no-camera', 'Camera is not available. Open this page over HTTPS or on localhost.')
+    if (!GlSource.supported()) throw new ScanError('no-webgl', 'This browser does not support WebGL2.')
     this.gl ??= new GlSource()
-    this.stream = await navigator.mediaDevices.getUserMedia({
-      audio: false,
-      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1920 }, frameRate: { ideal: this.frameRate } },
-    })
+    try {
+      this.stream = await navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1920 }, frameRate: { ideal: this.frameRate } },
+      })
+    } catch (e) {
+      const name = (e as Error)?.name
+      const code: ScanErrorCode =
+        name === 'NotAllowedError' || name === 'SecurityError' ? 'camera-denied'
+        : name === 'NotFoundError' || name === 'OverconstrainedError' ? 'camera-not-found'
+        : name === 'NotReadableError' || name === 'AbortError' ? 'camera-busy'
+        : 'unknown'
+      throw new ScanError(code, (e as Error)?.message || String(e))
+    }
     const track = this.stream.getVideoTracks()[0]
     try {
       const caps = (track.getCapabilities?.() ?? {}) as { focusMode?: string[] }

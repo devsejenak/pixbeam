@@ -1,10 +1,37 @@
-import { ErrorMap, ErrorSummary, FrameReport, Layout } from '../core'
+import { defaultDiagnosticHints, DiagnosticHints, ErrorMap, ErrorSummary, FrameReport, Layout } from '../core'
 
-const NAMES: Record<number, string[]> = {
-  3: ['hitam', 'biru', 'hijau', 'cyan', 'merah', 'magenta', 'kuning', 'putih'],
-  2: ['putih', 'merah', 'hijau', 'biru'],
-  1: ['hitam', 'putih'],
+export interface DebugPanelText {
+  waiting: string
+  mode: string
+  modeExact: string
+  modePacket: string
+  cellError: string
+  centerEdge: string
+  shift: string
+  swapped: string
+  /** Palette color names, by palette size (2, 4, 8 colors). */
+  colors: { 1: string[]; 2: string[]; 3: string[] }
+  hints: DiagnosticHints
 }
+
+export const defaultDebugPanelText: DebugPanelText = {
+  waiting: 'Waiting for a locked frame…',
+  mode: 'Mode',
+  modeExact: 'test pattern (per cell)',
+  modePacket: 'per packet (estimate)',
+  cellError: 'Cell error',
+  centerEdge: 'Center / edge',
+  shift: 'Shift direction',
+  swapped: 'Swapped',
+  colors: {
+    3: ['black', 'blue', 'green', 'cyan', 'red', 'magenta', 'yellow', 'white'],
+    2: ['white', 'red', 'green', 'blue'],
+    1: ['black', 'white'],
+  },
+  hints: defaultDiagnosticHints,
+}
+
+const esc = (v: string) => v.replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`)
 
 const pct = (v: number, digits = 2) => `${(v * 100).toFixed(digits)}%`
 
@@ -29,6 +56,7 @@ export class DebugPanel {
     private root: HTMLElement,
     private canvas: HTMLCanvasElement,
     private text: HTMLElement,
+    private t: DebugPanelText = defaultDebugPanelText,
   ) {}
 
   setEnabled(on: boolean) {
@@ -40,7 +68,7 @@ export class DebugPanel {
     this.map = null
     this.lastSummary = null
     this.frames = 0
-    this.text.textContent = 'Menunggu frame terkunci…'
+    this.text.textContent = this.t.waiting
     this.canvas.getContext('2d')?.clearRect(0, 0, this.canvas.width, this.canvas.height)
   }
 
@@ -85,19 +113,20 @@ export class DebugPanel {
     }
     ctx.putImageData(img, 0, 0)
 
-    const names = NAMES[layout.palette.length === 8 ? 3 : layout.palette.length === 4 ? 2 : 1]
-    const s = map.summary(names)
+    const { t } = this
+    const names = t.colors[layout.palette.length === 8 ? 3 : layout.palette.length === 4 ? 2 : 1]
+    const s = map.summary(names, t.hints)
     this.lastSummary = s
     const confusions = s.mode === 'exact' && s.confusions.length
       ? s.confusions.map((c) => `${names[c.from]}→${names[c.to]} ${pct(c.rate, 1)}`).join(' · ')
       : '-'
     this.text.innerHTML = [
-      `<div><span>Mode</span><b>${s.mode === 'exact' ? 'pola uji (per sel)' : 'per paket (perkiraan)'}</b></div>`,
-      `<div><span>Error sel</span><b>${pct(s.cellErrorRate, 3)}</b></div>`,
-      `<div><span>Tengah / tepi</span><b>${pct(s.centerRate)} / ${pct(s.edgeRate)}</b></div>`,
-      `<div><span>Arah geser</span><b>${s.mode === 'exact' ? s.directionBias.toFixed(2) : '-'}</b></div>`,
-      `<div class="wide"><span>Tertukar</span><b>${confusions}</b></div>`,
-      `<p>${s.hint}</p>`,
+      `<div><span>${esc(t.mode)}</span><b>${esc(s.mode === 'exact' ? t.modeExact : t.modePacket)}</b></div>`,
+      `<div><span>${esc(t.cellError)}</span><b>${pct(s.cellErrorRate, 3)}</b></div>`,
+      `<div><span>${esc(t.centerEdge)}</span><b>${pct(s.centerRate)} / ${pct(s.edgeRate)}</b></div>`,
+      `<div><span>${esc(t.shift)}</span><b>${s.mode === 'exact' ? s.directionBias.toFixed(2) : '-'}</b></div>`,
+      `<div class="wide"><span>${esc(t.swapped)}</span><b>${esc(confusions)}</b></div>`,
+      `<p>${esc(s.hint)}</p>`,
     ].join('')
   }
 }

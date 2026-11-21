@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { PixbeamConfig } from '../config'
+import { PixbeamMessages } from '../i18n'
 import { DebugPanel } from '../web/debug-panel'
-import { ReceivedFile, Scanner, ScanStats } from '../web/scanner'
+import { ReceivedFile, ScanError, Scanner, ScanStats } from '../web/scanner'
 import { formatBytes, formatTime, throttle } from './format'
 
 interface Props {
   config: PixbeamConfig
+  messages: PixbeamMessages
   active: boolean
 }
 
@@ -35,10 +37,10 @@ interface Result {
   text: string | null
 }
 
-const EMPTY_HUD: Hud = {
-  status: 'Mencari kode…', tone: '', progress: 0, packets: '0 / -', blocks: '-', speed: '-', valid: '-',
-  time: '-', ms: '-', camera: '-', process: '-', zoom: '-', align: '-', exposure: 'auto',
-}
+const emptyHud = (m: PixbeamMessages): Hud => ({
+  status: m.receive.searching, tone: '', progress: 0, packets: '0 / -', blocks: '-', speed: '-', valid: '-',
+  time: '-', ms: '-', camera: '-', process: '-', zoom: '-', align: '-', exposure: m.receive.exposureAuto,
+})
 
 const TEXT_FILE = /\.(txt|md|json|csv|js|ts|html|css|xml|log)$/i
 
@@ -77,35 +79,39 @@ function drawOverlay(canvas: HTMLCanvasElement, video: HTMLVideoElement, stats: 
   }
 }
 
-function toHud(s: ScanStats): Hud {
+function toHud(s: ScanStats, m: PixbeamMessages): Hud {
   const { report, fps, camera } = s
-  const hud: Hud = { ...EMPTY_HUD }
-  if (!report.corners) hud.status = 'Mencari 4 marker sudut…'
-  else if (!report.lock) hud.status = 'Marker terlihat, mencocokkan pengaturan…'
+  const t = m.receive
+  const hud = emptyHud(m)
+  if (!report.corners) hud.status = t.searchingCorners
+  else if (!report.lock) hud.status = t.matching
   else {
-    hud.status = `Terkunci · ${report.lock.preset.w}×${report.lock.preset.h} · ${2 ** report.lock.bits} warna`
+    hud.status = t.locked(report.lock.preset.w, report.lock.preset.h, 2 ** report.lock.bits)
     hud.tone = 'ok'
   }
-  hud.ms = `${Math.round(s.processMs)} ms/frame`
+  hud.ms = `${Math.round(s.processMs)} ${t.msPerFrame}`
   hud.valid = s.expectedPackets ? `${Math.round((s.validPackets / s.expectedPackets) * 100)}%` : '-'
   if (fps.camera) {
     hud.camera = `${fps.width}×${fps.height} · ${Math.round(fps.camera)} fps`
     hud.process = `${Math.round(fps.processed)} fps`
   }
-  hud.zoom = camera?.zoomSupported ? `${camera.zoom!.toFixed(1)}×` : 'tidak ada'
+  hud.zoom = camera?.zoomSupported ? `${camera.zoom!.toFixed(1)}×` : t.none
   hud.align = report.alignment ? `${report.alignment.found}/${report.alignment.total}` : '-'
-  hud.exposure = camera?.exposureLocked ? 'terkunci' : 'auto'
+  hud.exposure = camera?.exposureLocked ? t.exposureLocked : t.exposureAuto
   if (s.blockCount) {
     hud.progress = Math.min(99, (s.received / s.needed) * 100)
-    hud.packets = `${s.received.toLocaleString('id')} / ±${s.needed.toLocaleString('id')}`
+    hud.packets = `${s.received.toLocaleString(m.numberLocale)} / ±${s.needed.toLocaleString(m.numberLocale)}`
     hud.blocks = `${s.known}/${s.blockCount}`
     hud.speed = s.elapsed > 0 ? `${formatBytes(Math.round((s.received * s.blockSize) / s.elapsed))}/s` : '-'
-    hud.time = formatTime(s.elapsed)
+    hud.time = formatTime(s.elapsed, m.time)
   }
   return hud
 }
 
-export function ReceiveView({ config, active }: Props) {
+export function ReceiveView({ config, messages: m, active }: Props) {
+  const t = m.receive
+  const mRef = useRef(m)
+  mRef.current = m
   const videoRef = useRef<HTMLVideoElement>(null)
   const overlayRef = useRef<HTMLCanvasElement>(null)
   const debugRootRef = useRef<HTMLDivElement>(null)
@@ -117,7 +123,7 @@ export function ReceiveView({ config, active }: Props) {
   const [open, setOpen] = useState(false)
   const [autoZoom, setAutoZoom] = useState(config.autoZoom)
   const [lockExposure, setLockExposure] = useState(config.lockExposure)
-  const [hud, setHud] = useState<Hud>(EMPTY_HUD)
+  const [hud, setHud] = useState<Hud>(() => emptyHud(m))
   const [result, setResult] = useState<Result | null>(null)
   const [error, setError] = useState('')
   const [copied, setCopied] = useState('')
@@ -127,15 +133,15 @@ export function ReceiveView({ config, active }: Props) {
     const onStats = (s: ScanStats) => {
       drawOverlay(overlayRef.current!, videoRef.current!, s)
       debugRef.current?.update(s.report)
-      if (!doneRef.current && tick()) setHud(toHud(s))
+      if (!doneRef.current && tick()) setHud(toHud(s, mRef.current))
     }
     const onFile = (f: ReceivedFile) => {
       doneRef.current = true
       setHud((h) => ({
         ...h,
         progress: 100,
-        blocks: 'lengkap',
-        status: f.valid ? 'Selesai. File diterima utuh.' : 'Selesai, tetapi checksum gagal.',
+        blocks: mRef.current.receive.complete,
+        status: f.valid ? mRef.current.receive.doneValid : mRef.current.receive.doneInvalid,
         tone: f.valid ? 'ok' : 'bad',
       }))
       setResult({
@@ -149,7 +155,7 @@ export function ReceiveView({ config, active }: Props) {
       navigator.vibrate?.(80)
     }
     scannerRef.current = new Scanner(videoRef.current!, onStats, onFile)
-    if (config.debug) debugRef.current = new DebugPanel(debugRootRef.current!, heatmapRef.current!, debugInfoRef.current!)
+    if (config.debug) debugRef.current = new DebugPanel(debugRootRef.current!, heatmapRef.current!, debugInfoRef.current!, mRef.current.debug)
     return () => scannerRef.current?.stop()
   }, [config.debug])
 
@@ -161,7 +167,7 @@ export function ReceiveView({ config, active }: Props) {
       if (r) URL.revokeObjectURL(r.url)
       return null
     })
-    setHud(EMPTY_HUD)
+    setHud(emptyHud(m))
   }
 
   const close = () => {
@@ -190,7 +196,7 @@ export function ReceiveView({ config, active }: Props) {
       await scanner.start()
     } catch (e) {
       close()
-      setError((e as Error).message)
+      setError(e instanceof ScanError ? (t.errors[e.code] ?? e.message) : t.errors.unknown)
     }
   }
 
@@ -199,9 +205,9 @@ export function ReceiveView({ config, active }: Props) {
     if (!text) return
     try {
       await navigator.clipboard.writeText(text)
-      setCopied('Tersalin')
+      setCopied(t.copied)
     } catch {
-      setCopied('Gagal menyalin')
+      setCopied(t.copyFailed)
     }
     setTimeout(() => setCopied(''), 1500)
   }
@@ -210,17 +216,17 @@ export function ReceiveView({ config, active }: Props) {
     <>
       <div className="pb-grid pb-grid-single" hidden={!active}>
         <div className="pb-panel">
-          <h2>Penerima</h2>
-          <p className="pb-msg">Kamera akan terbuka layar penuh. Arahkan ke kode di layar pengirim sampai keempat marker sudut terlihat.</p>
+          <h2>{t.title}</h2>
+          <p className="pb-msg">{t.intro}</p>
           <label className="pb-check">
-            <input type="checkbox" checked={autoZoom} onChange={(e) => setAutoZoom(e.target.checked)} /> Zoom otomatis
+            <input type="checkbox" checked={autoZoom} onChange={(e) => setAutoZoom(e.target.checked)} /> {t.autoZoom}
           </label>
           <label className="pb-check">
-            <input type="checkbox" checked={lockExposure} onChange={(e) => setLockExposure(e.target.checked)} /> Kunci exposure dan white balance saat terkunci
+            <input type="checkbox" checked={lockExposure} onChange={(e) => setLockExposure(e.target.checked)} /> {t.lockExposure}
           </label>
           <div className="pb-row">
             <button className="pb-primary" onClick={startScan}>
-              Mulai scan
+              {t.start}
             </button>
           </div>
           {error && <p className="pb-msg bad">{error}</p>}
@@ -233,7 +239,7 @@ export function ReceiveView({ config, active }: Props) {
         <div className="pb-hud">
           <div className="pb-hud-top">
             <span className={`pb-hud-status ${hud.tone}`}>{hud.status}</span>
-            <button className="pb-close" onClick={close} aria-label="Tutup kamera">
+            <button className="pb-close" onClick={close} aria-label={t.closeCamera}>
               ✕
             </button>
           </div>
@@ -241,23 +247,23 @@ export function ReceiveView({ config, active }: Props) {
             <i style={{ width: `${hud.progress}%` }} />
           </div>
           <div className="pb-hud-line">
-            <span>Paket <b>{hud.packets}</b></span>
-            <span>Blok <b>{hud.blocks}</b></span>
+            <span>{t.hud.packets} <b>{hud.packets}</b></span>
+            <span>{t.hud.blocks} <b>{hud.blocks}</b></span>
             <span><b>{hud.speed}</b></span>
           </div>
           <div className="pb-hud-line">
-            <span>Valid <b>{hud.valid}</b></span>
-            <span>Waktu <b>{hud.time}</b></span>
+            <span>{t.hud.valid} <b>{hud.valid}</b></span>
+            <span>{t.hud.time} <b>{hud.time}</b></span>
             <span><b>{hud.ms}</b></span>
           </div>
           <div className="pb-hud-line">
-            <span>Kamera <b>{hud.camera}</b></span>
-            <span>Proses <b>{hud.process}</b></span>
+            <span>{t.hud.camera} <b>{hud.camera}</b></span>
+            <span>{t.hud.process} <b>{hud.process}</b></span>
           </div>
           <div className="pb-hud-line">
-            <span>Zoom <b>{hud.zoom}</b></span>
-            <span>Align <b>{hud.align}</b></span>
-            <span>Cahaya <b>{hud.exposure}</b></span>
+            <span>{t.hud.zoom} <b>{hud.zoom}</b></span>
+            <span>{t.hud.align} <b>{hud.align}</b></span>
+            <span>{t.hud.light} <b>{hud.exposure}</b></span>
           </div>
         </div>
 
@@ -270,11 +276,11 @@ export function ReceiveView({ config, active }: Props) {
               </div>
             </div>
             <div className="pb-debug-info" ref={debugInfoRef}>
-              Menunggu frame terkunci…
+              {m.debug.waiting}
             </div>
             <div className="pb-debug-actions">
-              <button onClick={() => debugRef.current?.reset()}>Reset peta</button>
-              <button onClick={copyReport}>{copied || 'Salin laporan'}</button>
+              <button onClick={() => debugRef.current?.reset()}>{t.resetMap}</button>
+              <button onClick={copyReport}>{copied || t.copyReport}</button>
             </div>
           </div>
         )}
@@ -283,14 +289,14 @@ export function ReceiveView({ config, active }: Props) {
           <div className={`pb-sheet ${config.debug ? 'with-debug' : ''}`}>
             <h3>{result.name}</h3>
             <p>
-              {formatBytes(result.size)} dalam {formatTime(result.seconds)} · {result.valid ? 'checksum cocok' : 'checksum tidak cocok'}
+              {t.result(formatBytes(result.size), formatTime(result.seconds, m.time), result.valid)}
             </p>
             <div className="pb-row">
               <a className="pb-button pb-primary" href={result.url} download={result.name}>
-                Unduh file
+                {t.download}
               </a>
-              <button onClick={reset}>Scan lagi</button>
-              <button onClick={close}>Tutup</button>
+              <button onClick={reset}>{t.again}</button>
+              <button onClick={close}>{t.close}</button>
             </div>
             {result.text !== null && <pre>{result.text}</pre>}
           </div>

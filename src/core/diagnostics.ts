@@ -23,6 +23,41 @@ export class TestPattern implements PacketSource {
 
 export type ErrorMode = 'exact' | 'packet'
 
+/** Text used to build the human readable hint in {@link ErrorSummary}. */
+export interface DiagnosticHints {
+  /** Row names, top to bottom. */
+  rows: [string, string, string]
+  /** Column names, left to right. */
+  cols: [string, string, string]
+  area: (row: string, col: string) => string
+  clean: string
+  geometry: string
+  cluster: (times: string) => string
+  edge: string
+  center: string
+  spread: string
+  worstArea: (area: string) => string
+  someArea: (area: string) => string
+  confusion: (from: string, to: string) => string
+  usePattern: string
+}
+
+export const defaultDiagnosticHints: DiagnosticHints = {
+  rows: ['top', 'middle', 'bottom'],
+  cols: ['left', 'center', 'right'],
+  area: (row, col) => `${row} ${col}`,
+  clean: 'Almost no errors. You can raise the grid size or the fps.',
+  geometry: 'Errors are cells shifted the same way in each area: a geometry problem, such as lens distortion or imprecise markers. More alignment markers would help.',
+  cluster: (times) => `Errors gather in one area (${times}× the average): usually glare, an out-of-focus spot, or local distortion. Check its shape on the map.`,
+  edge: 'Errors pile up at the edges: likely lens distortion or darker screen edges.',
+  center: 'Errors pile up in the center: likely glare, focus, or an uneven screen.',
+  spread: 'Errors are spread evenly: more likely a color problem, blur, or cells that are too small.',
+  worstArea: (area) => `Worst area: ${area}.`,
+  someArea: (area) => `Area: ${area}.`,
+  confusion: (from, to) => `Most often swapped colors: ${from} read as ${to}.`,
+  usePattern: 'For an accurate per-cell map, turn on the test pattern on the sender.',
+}
+
 export interface ErrorSummary {
   mode: ErrorMode
   frames: number
@@ -69,7 +104,7 @@ export class ErrorMap {
     return this.samples[idx] ? this.errors[idx] / this.samples[idx] : 0
   }
 
-  summary(names: string[]): ErrorSummary {
+  summary(names: string[], hints: DiagnosticHints = defaultDiagnosticHints): ErrorSummary {
     const { w, h, dataCells } = this.layout
     let err = 0
     let tot = 0
@@ -86,7 +121,7 @@ export class ErrorMap {
       const bucket = inner ? region.center : region.edge
       bucket[0] += this.errors[idx]
       bucket[1] += this.samples[idx]
-      const key = `${ny < 1 / 3 ? 'atas' : ny < 2 / 3 ? 'tengah' : 'bawah'} ${nx < 1 / 3 ? 'kiri' : nx < 2 / 3 ? 'tengah' : 'kanan'}`
+      const key = hints.area(hints.rows[ny < 1 / 3 ? 0 : ny < 2 / 3 ? 1 : 2], hints.cols[nx < 1 / 3 ? 0 : nx < 2 / 3 ? 1 : 2])
       const a = (areas[key] ??= [0, 0])
       a[0] += this.errors[idx]
       a[1] += this.samples[idx]
@@ -130,7 +165,7 @@ export class ErrorMap {
       edgeRate,
       worstRegion: worst ? worst[0] : '-',
       confusions: confusions.slice(0, 3),
-      hint: hintFor(this.mode, cellErrorRate, directionBias, concentration, centerRate, edgeRate, worst ? worst[0] : '', confusions, names),
+      hint: hintFor(this.mode, cellErrorRate, directionBias, concentration, centerRate, edgeRate, worst ? worst[0] : '', confusions, names, hints),
     }
   }
 
@@ -192,24 +227,19 @@ function hintFor(
   worst: string,
   confusions: ErrorSummary['confusions'],
   names: string[],
+  t: DiagnosticHints,
 ): string {
-  if (total < 0.0005) return 'Hampir tanpa error. Grid bisa dinaikkan atau fps dipercepat.'
+  if (total < 0.0005) return t.clean
   const parts: string[] = []
-  if (mode === 'exact' && bias > 0.47) {
-    parts.push('Error berupa sel yang bergeser ke arah yang sama di tiap area: masalah geometri, misalnya distorsi lensa atau marker kurang presisi. Alignment marker tambahan akan membantu.')
-  } else if (concentration > 2.5) {
-    parts.push(`Error terkumpul di satu area (${concentration.toFixed(1)}× rata-rata): biasanya pantulan cahaya, bagian yang tidak fokus, atau distorsi lokal. Lihat bentuknya di peta.`)
-  } else if (edge > center * 2 && edge > 0.002) {
-    parts.push('Error menumpuk di tepi: kemungkinan distorsi lensa atau cahaya tepi layar lebih gelap.')
-  } else if (center > edge * 2 && center > 0.002) {
-    parts.push('Error menumpuk di tengah: kemungkinan pantulan cahaya, fokus, atau layar tidak rata.')
-  } else {
-    parts.push('Error tersebar merata: lebih mungkin masalah warna, blur, atau sel terlalu kecil.')
-  }
-  if (worst && concentration <= 2.5) parts.push(`Area terburuk: ${worst}.`)
-  else if (worst) parts.push(`Area: ${worst}.`)
+  if (mode === 'exact' && bias > 0.47) parts.push(t.geometry)
+  else if (concentration > 2.5) parts.push(t.cluster(concentration.toFixed(1)))
+  else if (edge > center * 2 && edge > 0.002) parts.push(t.edge)
+  else if (center > edge * 2 && center > 0.002) parts.push(t.center)
+  else parts.push(t.spread)
+  if (worst && concentration <= 2.5) parts.push(t.worstArea(worst))
+  else if (worst) parts.push(t.someArea(worst))
   const top = confusions[0]
-  if (mode === 'exact' && bias <= 0.47 && top && top.rate > 0.01) parts.push(`Warna yang paling sering tertukar: ${names[top.from]} terbaca ${names[top.to]}.`)
-  if (mode === 'packet') parts.push('Untuk peta per sel yang akurat, aktifkan Pola uji di pengirim.')
+  if (mode === 'exact' && bias <= 0.47 && top && top.rate > 0.01) parts.push(t.confusion(names[top.from], names[top.to]))
+  if (mode === 'packet') parts.push(t.usePattern)
   return parts.join(' ')
 }

@@ -62,7 +62,7 @@ export class GlSource implements FrameSource {
 
   constructor() {
     const gl = document.createElement('canvas').getContext('webgl2', { preserveDrawingBuffer: false, antialias: false })
-    if (!gl) throw new Error('WebGL2 tidak tersedia')
+    if (!gl) throw new Error('WebGL2 is not available')
     this.gl = gl
     this.smallProg = this.program(SMALL)
     this.rectProg = this.program(RECTIFY)
