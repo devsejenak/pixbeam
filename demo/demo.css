@@ -1,0 +1,7 @@
+@import "../src/react/pixbeam.css";
+:root{color-scheme:light dark}
+body{margin:0;background:light-dark(#fff,#0b0b0b);color:light-dark(#0b0b0b,#f2f2f2);font:15px/1.6 Inter,system-ui,sans-serif}
+.nav{border-bottom:1px solid light-dark(#e6e6e6,#262626)}
+.nav-inner{max-width:1200px;margin:0 auto;padding:14px max(4vw,16px);display:flex;align-items:center;gap:10px;font-weight:600}
+.logo{width:28px;height:28px;border-radius:7px;background:light-dark(#0b0b0b,#f2f2f2);color:light-dark(#fff,#0b0b0b);display:grid;place-items:center;font:600 10px ui-monospace,monospace}
+.muted{color:light-dark(#6b6b6b,#9a9a9a);font-weight:400}

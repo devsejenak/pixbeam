@@ -1,0 +1,36 @@
+{
+  "name": "@devsejenak/pixbeam",
+  "version": "0.3.0",
+  "description": "Kirim file dari layar ke kamera HP lewat animasi kode berwarna, langsung di browser.",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": [
+    "*.css"
+  ],
+  "exports": {
+    ".": "./src/index.ts",
+    "./react": "./src/react/index.ts",
+    "./style.css": "./src/react/pixbeam.css"
+  },
+  "scripts": {
+    "dev": "vite demo",
+    "build": "node scripts/build-standalone.mjs",
+    "typecheck": "tsc -p .",
+    "test": "node scripts/run-test.mjs node",
+    "test:alignment": "node scripts/run-test.mjs alignment",
+    "test:zoom": "node scripts/run-test.mjs zoom"
+  },
+  "peerDependencies": {
+    "react": ">=18",
+    "react-dom": ">=18"
+  },
+  "devDependencies": {
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "esbuild": "^0.28.2",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.8"
+  }
+}
