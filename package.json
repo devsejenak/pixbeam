@@ -1,7 +1,7 @@
 {
   "name": "pixbeam",
   "version": "0.3.0",
-  "description": "Kirim file dari layar ke kamera HP lewat animasi kode berwarna, langsung di browser.",
+  "description": "Send files from your screen to your phone through the camera, using animated color codes. No internet, no cables, no app.",
   "license": "MIT",
   "author": "devsejenak",
   "homepage": "https://tools.devsejenak.com/pixbeam",
