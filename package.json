@@ -1,5 +1,5 @@
 {
-  "name": "@devsejenak/pixbeam",
+  "name": "pixbeam",
   "version": "0.3.0",
   "description": "Kirim file dari layar ke kamera HP lewat animasi kode berwarna, langsung di browser.",
   "license": "MIT",

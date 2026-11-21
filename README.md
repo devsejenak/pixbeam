@@ -26,8 +26,8 @@ test/      simulasi kamera di Node
 ## Pakai sebagai komponen
 
 ```tsx
-import { Pixbeam } from '@devsejenak/pixbeam/react'
-import '@devsejenak/pixbeam/style.css'
+import { Pixbeam } from 'pixbeam/react'
+import 'pixbeam/style.css'
 
 <Pixbeam config={{ debug: true, testPattern: true }} />
 ```
